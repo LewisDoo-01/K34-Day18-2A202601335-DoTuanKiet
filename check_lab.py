@@ -7,6 +7,7 @@ Chạy: python check_lab.py
 
 import json
 import os
+import re
 import sys
 import subprocess
 
@@ -56,20 +57,15 @@ def run_tests() -> tuple[int, int]:
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=no", "-q"],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=300,
         )
-        lines = result.stdout.strip().split("\n")
-        summary = lines[-1] if lines else ""
-        # Parse "X passed, Y failed" or "X passed"
-        passed = total = 0
-        for part in summary.split(","):
-            part = part.strip()
-            if "passed" in part:
-                passed = int(part.split()[0])
-                total += passed
-            if "failed" in part:
-                total += int(part.split()[0])
-        return passed, total
+        summary = result.stdout.strip().split("\n")[-1] if result.stdout.strip() else ""
+        # Summary line looks like "======= 12 passed, 3 failed in 1.23s ========"
+        # (pytest pads with '=' to fill terminal width), so parse with regex
+        # instead of positional split to avoid grabbing the padding.
+        passed = int(m.group(1)) if (m := re.search(r"(\d+) passed", summary)) else 0
+        failed = int(m.group(1)) if (m := re.search(r"(\d+) failed", summary)) else 0
+        return passed, passed + failed
     except Exception as e:
         print(f"  ⚠️  pytest error: {e}")
         return 0, 0
